@@ -1,0 +1,16 @@
+format: repo-guard/requirement-v1
+id: FGMR-PRODUCT-000
+normative: "### FGMR-PRODUCT-000 — Offline compiler for procedural 3D reconstruction from voxel geometry, sprites and source metadata. This is accepted project direction, not evidence of a working implementation."
+lifecycle:
+  accepted: true
+  current: true
+  published: false
+relations:
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "README.md"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "docs/requirements-hierarchy.md"

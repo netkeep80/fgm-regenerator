@@ -1,0 +1,24 @@
+format: repo-guard/requirement-v1
+id: FGMR-GOV-001
+normative: "### FGMR-GOV-001 — For every PR targeting main, CI shall check exact BASE and HEAD with immutable RepoGuard v6.0.1 at 74db97791e6da8a75287164f0d0b41579108f114; absence of mandatory GitHub branch protection or functional testing must not be represented as such protection."
+lifecycle:
+  accepted: true
+  current: true
+  published: false
+relations:
+  - predicates: [derives_from]
+    target:
+      kind: requirement
+      id: "FGMR-PROJECT-000"
+  - predicates: [implemented_by]
+    target:
+      kind: artifact
+      path: ".github/workflows/repo-guard.yml"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "README.md"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "docs/requirements-hierarchy.md"
