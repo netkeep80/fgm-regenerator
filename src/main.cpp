@@ -1,21 +1,22 @@
+#include "local-files.hpp"
+
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <limits>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
 namespace {
-constexpr std::uintmax_t kMaxFile = 16ULL * 1024 * 1024;
-constexpr std::size_t kMaxFiles = 10000;
+constexpr std::uintmax_t kMaxFileBytes = 16ULL * 1024 * 1024;
+constexpr std::size_t kMaxDirectoryEntries = 10000;
 struct Result {
     std::string category, name, type, diagnosis;
     std::uintmax_t bytes = 0;
@@ -27,9 +28,32 @@ struct Report {
     std::size_t passed = 0;
     std::size_t failed = 0;
 };
-std::string upper(std::string text) {
-    for (auto &c : text) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    return text;
+bool sameFormatName(const fs::path& path, std::string_view expected) {
+    const auto& name = path.native();
+    return name.size() == expected.size() &&
+           std::equal(name.begin(), name.end(), expected.begin(), [](auto actual, char wanted) {
+               if (actual >= 'a' && actual <= 'z') actual -= 'a' - 'A';
+               return actual == wanted;
+           });
+}
+
+bool validUtf8(std::string_view text) {
+    while (!text.empty()) {
+        const auto lead = static_cast<unsigned char>(text.front());
+        text.remove_prefix(1);
+        if (lead < 0x80) continue;
+        if (lead < 0xc2 || lead > 0xf4) return false;
+        const std::size_t tailSize = lead < 0xe0 ? 1 : (lead < 0xf0 ? 2 : 3);
+        if (text.size() < tailSize) return false;
+        const auto first = static_cast<unsigned char>(text.front());
+        if ((lead == 0xe0 && first < 0xa0) || (lead == 0xed && first > 0x9f) ||
+            (lead == 0xf0 && first < 0x90) || (lead == 0xf4 && first > 0x8f)) return false;
+        for (const unsigned char c : text.substr(0, tailSize)) {
+            if (c < 0x80 || c > 0xbf) return false;
+        }
+        text.remove_prefix(tailSize);
+    }
+    return true;
 }
 std::string jsonString(std::string_view src) {
     std::ostringstream out;
@@ -51,84 +75,111 @@ void invalid(Report& report, const std::string& diagnostic) {
     ++report.failed;
     report.diagnostics.push_back(diagnostic);
 }
-fs::path childDir(const fs::path& root, const std::string& target) {
-    std::error_code ec;
-    for (fs::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
-        if (upper(it->path().filename().string()) != target) continue;
-        if (it->is_symlink(ec) || ec) return {};
-        if (it->is_directory(ec) && !ec) return it->path();
-        return {};
-    }
-    return {};
-}
-void validateFile(Report& report, const std::string& category, const fs::path& path,
-                  const std::string& type) {
+void validateFile(Report& report, const local::Directory& folder, std::string_view category,
+                  const fs::path& name, std::string_view type) {
     Result result;
     result.category = category;
-    result.name = path.filename().string();
     result.type = type;
-    std::error_code ec;
-    if (fs::is_symlink(path, ec) || ec || !fs::is_regular_file(path, ec) || ec) {
-        result.diagnosis = "Недопустимый тип файла";
+    try {
+        const auto utf8 = name.u8string();
+        result.name.assign(utf8.begin(), utf8.end());
+    } catch (const std::system_error&) {
+        invalid(report, "Имя ресурса нельзя представить в UTF-8");
+        return;
+    }
+    if (!validUtf8(result.name)) {
+        invalid(report, "Имя ресурса нельзя представить в UTF-8");
+        return;
+    }
+    const auto file = folder.resource(name, type == "MAP", kMaxFileBytes);
+    result.bytes = file.size;
+    if (file.status == local::Status::invalidType) {
+        result.diagnosis = "Недопустимый тип файла или ошибка открытия";
+    } else if (file.status == local::Status::limit) {
+        result.diagnosis = "Превышен лимит 16 МиБ";
+    } else if (file.status == local::Status::ioError) {
+        result.diagnosis = "MAP: ошибка чтения заголовка";
+    } else if (type == "MAP") {
+        const auto& dims = file.header;
+        if (result.bytes < dims.size()) {
+            result.diagnosis = "MAP: отсутствует заголовок";
+        } else if (dims[0] == 0 || dims[1] == 0 || dims[2] == 0) {
+            result.diagnosis = "MAP: нулевая размерность";
+        } else {
+            const std::uintmax_t expected = 3 + 4ULL * dims[0] * dims[1] * dims[2];
+            result.valid = expected == result.bytes;
+            if (!result.valid) result.diagnosis = "MAP: длина не соответствует размерностям";
+        }
     } else {
-        result.bytes = fs::file_size(path, ec);
-        if (ec || result.bytes > kMaxFile) {
-            result.diagnosis = "Ошибка размера или превышен лимит 16 МиБ";
-        } else if (type == "MAP") {
-            if (result.bytes < 3) result.diagnosis = "MAP: отсутствует заголовок";
-            else {
-                std::ifstream stream(path, std::ios::binary);
-                std::array<unsigned char, 3> dims{};
-                if (!stream.read(reinterpret_cast<char*>(dims.data()), 3))
-                    result.diagnosis = "MAP: ошибка чтения заголовка";
-                else if (dims[0] == 0 || dims[1] == 0 || dims[2] == 0)
-                    result.diagnosis = "MAP: нулевая размерность";
-                else {
-                    const std::uintmax_t expected = 3 + 4ULL * dims[0] * dims[1] * dims[2];
-                    if (expected != result.bytes)
-                        result.diagnosis = "MAP: длина не соответствует размерностям";
-                    else result.valid = true;
-                }
-            }
-        } else if (type == "MCD") {
-            result.valid = result.bytes != 0 && result.bytes % 62 == 0;
-            if (!result.valid) result.diagnosis = "MCD: размер не кратен 62 байтам";
-        } else if (type == "LOFTEMPS") {
-            result.valid = result.bytes != 0 && result.bytes % 32 == 0;
-            if (!result.valid) result.diagnosis = "LOFTEMPS: размер не кратен 32 байтам";
+        const auto recordBytes = type == "MCD" ? 62u : 32u;
+        result.valid = result.bytes != 0 && result.bytes % recordBytes == 0;
+        if (!result.valid) {
+            result.diagnosis = result.type + ": размер должен быть положительным и кратным " +
+                               std::to_string(recordBytes) + " байтам";
         }
     }
     if (result.valid) ++report.passed;
     else ++report.failed;
     report.items.push_back(std::move(result));
 }
-void scan(Report& report, const fs::path& root) {
-    for (const auto& category : {"MAPS", "TERRAIN", "GEODATA"}) {
-        fs::path folder = childDir(root, category);
-        if (folder.empty()) {
-            invalid(report, std::string("Не найден обязательный каталог: ") + category);
+bool checkListing(Report& report, const local::Listing& listing, std::string_view category) {
+    if (listing.status == local::Status::ok) return true;
+    const auto message = listing.status == local::Status::limit ?
+        "Превышен лимит 10000 записей каталога: " : "Ошибка чтения каталога: ";
+    invalid(report, message + std::string(category));
+    return false;
+}
+
+void scan(Report& report, const local::Directory& root) {
+    const auto rootEntries = root.list(kMaxDirectoryEntries);
+    if (!checkListing(report, rootEntries, "исходная игра")) return;
+
+    struct Format {
+        std::string_view category, type, selector;
+        bool exactFilename;
+    };
+    constexpr std::array formats{
+        Format{"MAPS", "MAP", ".MAP", false},
+        Format{"TERRAIN", "MCD", ".MCD", false},
+        Format{"GEODATA", "LOFTEMPS", "LOFTEMPS.DAT", true},
+    };
+    for (const auto& format : formats) {
+        const std::string category(format.category);
+        std::vector<fs::path> folders;
+        for (const auto& name : rootEntries.names) {
+            if (sameFormatName(name, format.category)) folders.push_back(name);
+        }
+        if (folders.size() != 1) {
+            invalid(report, (folders.empty() ? "Не найден обязательный каталог: " :
+                    "Неоднозначное имя обязательного каталога: ") + category);
             continue;
         }
-        const std::size_t before = report.items.size();
-        std::error_code ec;
-        for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
-            if (report.items.size() >= kMaxFiles) {
-                invalid(report, "Превышен лимит 10000 файлов");
-                return;
-            }
-            const auto path = it->path();
-            const auto ext = upper(path.extension().string());
-            std::string type;
-            if (std::string(category) == "MAPS" && ext == ".MAP") type = "MAP";
-            else if (std::string(category) == "TERRAIN" && ext == ".MCD") type = "MCD";
-            else if (std::string(category) == "GEODATA" && upper(path.filename().string()) == "LOFTEMPS.DAT") type = "LOFTEMPS";
-            if (!type.empty()) validateFile(report, category, path, type);
+        auto folder = root.child(folders.front());
+        if (!folder) {
+            invalid(report, "Недопустимый или недоступный каталог: " + category);
+            continue;
         }
-        if (ec) invalid(report, std::string("Ошибка чтения каталога: ") + category);
-        if (report.items.size() == before)
-            invalid(report, std::string("Не найдены поддерживаемые файлы: ") + category);
+        const auto entries = folder.list(kMaxDirectoryEntries);
+        if (!checkListing(report, entries, category)) continue;
+        std::vector<fs::path> names;
+        for (const auto& name : entries.names) {
+            if (sameFormatName(format.exactFilename ? name : name.extension(), format.selector)) {
+                names.push_back(name);
+            }
+        }
+        if (names.empty()) {
+            invalid(report, "Не найдены поддерживаемые файлы: " + category);
+            continue;
+        }
+        if (format.exactFilename && names.size() != 1) {
+            invalid(report, "Неоднозначное имя ресурса LOFTEMPS.DAT");
+            continue;
+        }
+        std::sort(names.begin(), names.end());
+        for (const auto& name : names) {
+            validateFile(report, folder, format.category, name, format.type);
+        }
     }
-    if (report.items.empty()) invalid(report, "Не найдены поддерживаемые игровые ресурсы");
     std::sort(report.items.begin(), report.items.end(), [](const Result& a, const Result& b) {
         return std::tie(a.category, a.name) < std::tie(b.category, b.name);
     });
@@ -161,50 +212,84 @@ std::string toJson(const Report& report, std::string_view mode) {
 void usage() {
     std::cerr << "Использование: fgm-regenerator inspect|validate --source КАТАЛОГ [--report JSON_ФАЙЛ]\n";
 }
-} // namespace
-
-int main(int argc, char** argv) {
-    if (argc < 4) { usage(); return 64; }
-    const std::string mode = argv[1];
-    if (mode != "inspect" && mode != "validate") { usage(); return 64; }
+template <typename Char>
+int run(int argc, Char** argv) {
+    if (argc < 4) {
+        usage();
+        return 64;
+    }
+    const fs::path command(argv[1]);
+    if (command != "inspect" && command != "validate") {
+        usage();
+        return 64;
+    }
+    const std::string_view mode = command == "inspect" ? "inspect" : "validate";
     fs::path source, destination;
     for (int i = 2; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if ((arg == "--source" || arg == "--report") && i + 1 < argc) {
-            fs::path path = argv[++i];
-            if (arg == "--source" && source.empty()) source = std::move(path);
-            else if (arg == "--report" && destination.empty()) destination = std::move(path);
-            else { usage(); return 64; }
-        } else { usage(); return 64; }
+        const fs::path option(argv[i]);
+        if (i + 1 == argc || argv[i + 1][0] == 0) {
+            usage();
+            return 64;
+        }
+        if (option == "--source" && source.empty()) {
+            source = argv[++i];
+        } else if (option == "--report" && destination.empty()) {
+            destination = argv[++i];
+        } else {
+            usage();
+            return 64;
+        }
     }
-    std::error_code ec;
-    if (source.empty() || fs::is_symlink(source, ec) || ec || !fs::is_directory(source, ec) || ec) {
+
+    auto sourceChain = source.empty() ? std::vector<local::Directory>{} : local::Directory::openPath(source);
+    if (sourceChain.empty()) {
         std::cerr << "Ошибка: не найден разрешённый исходный каталог\n";
         return 64;
     }
-    const auto normalizedSource = fs::weakly_canonical(source, ec);
-    if (ec) { std::cerr << "Ошибка: не удалось проверить исходный каталог\n"; return 64; }
+    const auto& root = sourceChain.back();
+    std::vector<local::Directory> reportChain;
     if (!destination.empty()) {
-        const auto outPath = fs::weakly_canonical(destination, ec);
-        if (ec) { std::cerr << "Ошибка: неверный путь отчёта\n"; return 64; }
-        const auto src = normalizedSource.generic_string();
-        const auto out = outPath.generic_string();
-        if (out == src || (out.size() > src.size() && out.substr(0, src.size()) == src && out[src.size()] == '/')) {
+        auto parent = destination.parent_path();
+        if (parent.empty()) parent = ".";
+        reportChain = local::Directory::openPath(parent);
+        if (reportChain.empty()) {
+            std::cerr << "Ошибка: неверный или недоступный каталог отчёта\n";
+            return 64;
+        }
+        if (std::any_of(reportChain.begin(), reportChain.end(), [&root](const auto& dir) {
+                return root.sameAs(dir);
+            })) {
             std::cerr << "Ошибка: отчёт нельзя сохранять внутри исходной игры\n";
             return 64;
         }
-        if (fs::is_symlink(destination, ec) && !ec) {
-            std::cerr << "Ошибка: отчёт не может быть символической ссылкой\n";
-            return 64;
-        }
     }
+
     Report report;
-    scan(report, normalizedSource);
+    scan(report, root);
     const std::string json = toJson(report, mode);
-    if (destination.empty()) std::cout << json;
-    else {
-        std::ofstream stream(destination, std::ios::binary | std::ios::trunc);
-        if (!stream || !(stream << json)) { std::cerr << "Ошибка записи отчёта\n"; return 73; }
+    if (destination.empty()) {
+        std::cout << json << std::flush;
+        if (!std::cout) {
+            std::cerr << "Ошибка вывода отчёта\n";
+            return 73;
+        }
+    } else if (!reportChain.back().writeNewReport(destination.filename(), json)) {
+        std::cerr << "Ошибка создания нового файла отчёта: проверьте имя, права и отсутствие файла\n";
+        return 73;
     }
     return mode == "validate" && report.failed ? 2 : 0;
+}
+} // namespace
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+#else
+int main(int argc, char** argv) {
+#endif
+    try {
+        return run(argc, argv);
+    } catch (const fs::filesystem_error&) {
+        std::cerr << "Ошибка обработки локального пути\n";
+        return 64;
+    }
 }

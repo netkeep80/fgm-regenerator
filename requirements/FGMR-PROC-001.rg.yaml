@@ -2,8 +2,8 @@ format: repo-guard/requirement-v1
 id: FGMR-PROC-001
 normative: "### FGMR-PROC-001 — Разработка семейства FGM/UFO Fractal должна выполняться линейно: единственная активная задача и единственный Draft PR одновременно. Перед передачей следующему чату или к следующему этапу необходимо зафиксировать в исходном Issue принятые решения, состояние, точные BASE/HEAD/TREE, результаты CI и следующий шаг, а нормативные решения описать в Requirements. Слияние разрешается только после явного авторского принятия точного HEAD и SHA-защищённой операции."
 lifecycle:
-  accepted: true
-  current: true
+  accepted: false
+  current: false
   published: false
 relations:
   - predicates: [derives_from]
@@ -14,6 +14,10 @@ relations:
     target:
       kind: artifact
       path: "docs/current-step.md"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "docs/requirements-hierarchy.md"
   - predicates: [documents]
     target:
       kind: artifact

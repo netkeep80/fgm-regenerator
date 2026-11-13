@@ -1,9 +1,9 @@
 format: repo-guard/requirement-v1
 id: FGMR-IMPORT-001
-normative: "### FGMR-IMPORT-001 — Локальный C++20 импортёр должен проверять структуру файлов MAP (три байта X/Y/Z и 4 байта на ячейку), MCD (62 байта на запись) и LOFTEMPS (32 байта на запись), безопасно работать с повреждёнными файлами и символическими ссылками, игнорировать посторонние ресурсы и выдавать JSON без абсолютных путей и игровых байтов. Команды inspect и validate должны быть детерминированно протестированы на собственных синтетических данных. Структурная проверка не означает интерпретации игровых полей."
+normative: "### FGMR-IMPORT-001 — Локальный импортёр C++20 должен структурно проверять MAP (три ненулевых байта размеров и 4 байта на ячейку), MCD (62 байта на запись) и LOFTEMPS (32 байта на запись). Входные файлы открываются только на чтение, символические ссылки отклоняются, посторонние и скрытые записи игнорируются. Результат должен быть корректным JSON в UTF-8 без абсолютных путей и содержимого игровых файлов. Параметр --report создаёт новый файл за пределами исходного каталога и сохраняет существующий файл при совпадении имени. Команды inspect и validate проверяются на собственных синтетических данных. Структурная проверка ограничена размерностями и длинами."
 lifecycle:
-  accepted: true
-  current: true
+  accepted: false
+  current: false
   published: false
 relations:
   - predicates: [derives_from]
@@ -14,6 +14,14 @@ relations:
     target:
       kind: artifact
       path: "src/main.cpp"
+  - predicates: [implemented_by]
+    target:
+      kind: artifact
+      path: "src/local-files.cpp"
+  - predicates: [implemented_by]
+    target:
+      kind: artifact
+      path: "src/local-files.hpp"
   - predicates: [implemented_by]
     target:
       kind: artifact
@@ -30,6 +38,10 @@ relations:
     target:
       kind: artifact
       path: "docs/current-step.md"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "docs/requirements-hierarchy.md"
   - predicates: [documents]
     target:
       kind: artifact
