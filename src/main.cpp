@@ -109,6 +109,7 @@ void scan(Report& report, const fs::path& root) {
             invalid(report, std::string("Не найден обязательный каталог: ") + category);
             continue;
         }
+        const std::size_t before = report.items.size();
         std::error_code ec;
         for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
             if (report.items.size() >= kMaxFiles) {
@@ -124,6 +125,8 @@ void scan(Report& report, const fs::path& root) {
             if (!type.empty()) validateFile(report, category, path, type);
         }
         if (ec) invalid(report, std::string("Ошибка чтения каталога: ") + category);
+        if (report.items.size() == before)
+            invalid(report, std::string("Не найдены поддерживаемые файлы: ") + category);
     }
     if (report.items.empty()) invalid(report, "Не найдены поддерживаемые игровые ресурсы");
     std::sort(report.items.begin(), report.items.end(), [](const Result& a, const Result& b) {
