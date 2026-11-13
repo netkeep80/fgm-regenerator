@@ -1,0 +1,20 @@
+format: repo-guard/requirement-v1
+id: FGMR-LIC-001
+normative: "### FGMR-LIC-001 — The existing Unlicense LICENSE shall be preserved, third-party copyright notices respected, and proprietary UFO/TFTD source and derivative assets excluded from public project distributions."
+lifecycle:
+  accepted: true
+  current: true
+  published: false
+relations:
+  - predicates: [derives_from]
+    target:
+      kind: requirement
+      id: "FGMR-PROJECT-000"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "LICENSE"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "README.md"
