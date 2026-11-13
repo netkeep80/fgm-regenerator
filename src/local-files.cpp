@@ -53,7 +53,7 @@ bool plainName(const fs::path& name) {
 
 HANDLE openDirectory(const fs::path& path) {
     return CreateFileW(path.c_str(), FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
-                       FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
 }
 
@@ -289,9 +289,14 @@ bool Directory::writeNewReport(const fs::path& name, std::string_view json) cons
         }
         const bool closed = file.close();
         if (remaining.empty() && closed) {
+#ifdef RENAME_NOREPLACE
             if (renameat2(dir, temporary.c_str(), dir, name.c_str(), RENAME_NOREPLACE) == 0) return true;
-            if ((errno == ENOSYS || errno == EINVAL || errno == EOPNOTSUPP) &&
-                linkat(dir, temporary.c_str(), dir, name.c_str(), 0) == 0) {
+            if (errno != ENOSYS && errno != EINVAL && errno != EOPNOTSUPP) {
+                unlinkat(dir, temporary.c_str(), 0);
+                return false;
+            }
+#endif
+            if (linkat(dir, temporary.c_str(), dir, name.c_str(), 0) == 0) {
                 unlinkat(dir, temporary.c_str(), 0);
                 return true;
             }
