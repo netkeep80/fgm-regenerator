@@ -54,6 +54,27 @@ RepoGuard v6.0.1 сам по себе не распознаёт русский �
 
 **Защита ветки:** одного workflow недостаточно. Для реального запрета слияния с ошибками необходимо включить обязательную проверку `RepoGuard exact BASE/HEAD` в настройках правил GitHub.
 
+## Текущий последовательный этап разработки
+
+**Единственная активная задача:** [R12-S1: локальный импортёр](https://github.com/netkeep80/fgm-regenerator/issues/17). Следующий этап — [C01 в fgm-core](https://github.com/netkeep80/fgm-core/issues/5), только после завершения и принятия R12. Подробности: [контекст текущего этапа](docs/current-step.md).
+
+Собрать и проверить локально:
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release
+ctest --test-dir build --build-config Release --output-on-failure
+```
+
+Пример команд после сборки (Windows/Visual Studio):
+
+```powershell
+.\build\Release\fgm-regenerator.exe inspect --source "D:\Games\X-COM UFO Defense"
+.\build\Release\fgm-regenerator.exe validate --source "D:\Games\X-COM UFO Defense" --report ".\inspection.json"
+```
+
+В текущем срезе проверяются только структуры MAP/MCD/LOFTEMPS; **нет** генерации FGM, декодирования семантики игровых полей, GPU или браузерного исполнения. Тесты в публичном CI используют исключительно синтетические файлы.
+
 ## Ближайший этап
 
 Преобразовать небольшой свободный набор «воксельная маска + спрайт» в математическую модель FGM, проверить геометрические ограничения и построить как минимум два новых художественных варианта. Сравнение с исходным спрайтом остаётся диагностикой, а не целью финальной графики.
