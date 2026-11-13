@@ -19,6 +19,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Set up Node.js for documentation tests
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Verify document-language checker, including negative tests
+        run: node --test tests/document-language.test.mjs
+      - name: Verify Russian documentation at exact HEAD
+        run: node scripts/check-document-language.mjs
       - name: RepoGuard exact snapshot transition
         uses: netkeep80/repo-guard@74db97791e6da8a75287164f0d0b41579108f114
         with:

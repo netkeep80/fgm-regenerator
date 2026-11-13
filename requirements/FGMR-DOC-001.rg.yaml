@@ -1,0 +1,43 @@
+format: repo-guard/requirement-v1
+id: FGMR-DOC-001
+normative: "### FGMR-DOC-001 — Документация проекта, включая README, отслеживаемые файлы Markdown и нормативные формулировки Requirements, должна быть написана на русском языке. Исключения допускаются только для текстов сторонних лицензий, кода, имён собственных, адресов, машинных идентификаторов и стандартных технических обозначений. Проверка должна выполняться автоматически в CI на точном HEAD до RepoGuard; отрицательные тесты должны доказывать отказ на англоязычном заголовке, абзаце и нормативном тексте."
+lifecycle:
+  accepted: true
+  current: true
+  published: false
+relations:
+  - predicates: [derives_from]
+    target:
+      kind: requirement
+      id: "FGMR-PROJECT-000"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "README.md"
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "docs/requirements-hierarchy.md"
+  - predicates: [implemented_by]
+    target:
+      kind: artifact
+      path: "scripts/check-document-language.mjs"
+  - predicates: [implemented_by]
+    target:
+      kind: artifact
+      path: ".github/workflows/repo-guard.yml"
+  - predicates: [verified_by]
+    target:
+      kind: artifact
+      path: "tests/document-language.test.mjs"
+constraints:
+  - id: russian_documentation_execution
+    activation: scoped_change
+    scope:
+      relations: [documents, implemented_by, verified_by]
+    evidence:
+      class: execution
+      key: "execution:tests/document-language.test.mjs"
+      verifier:
+        kind: artifact
+        path: "tests/document-language.test.mjs"

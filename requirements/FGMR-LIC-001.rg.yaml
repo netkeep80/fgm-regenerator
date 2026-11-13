@@ -1,6 +1,6 @@
 format: repo-guard/requirement-v1
 id: FGMR-LIC-001
-normative: "### FGMR-LIC-001 — The existing Unlicense LICENSE shall be preserved, third-party copyright notices respected, and proprietary UFO/TFTD source and derivative assets excluded from public project distributions."
+normative: "### FGMR-LIC-001 — Репозиторий должен сохранять исходную лицензию Unlicense в файле LICENSE, соблюдать лицензии стороннего кода и исключать проприетарные ресурсы UFO/TFTD и их производные из публичных поставок без соответствующих прав."
 lifecycle:
   accepted: true
   current: true

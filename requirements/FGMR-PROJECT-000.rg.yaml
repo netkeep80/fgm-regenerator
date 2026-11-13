@@ -1,6 +1,6 @@
 format: repo-guard/requirement-v1
 id: FGMR-PROJECT-000
-normative: "### FGMR-PROJECT-000 — Project changes shall preserve explicit requirements and versioned evidence, distinguish product verification from governance checks, and protect license/source boundaries."
+normative: "### FGMR-PROJECT-000 — Проект должен поддерживать явную иерархию требований, воспроизводимые свидетельства для точных ревизий, независимую проверку свойств продукта и соблюдение границ лицензий и исходных данных."
 lifecycle:
   accepted: true
   current: true
