@@ -70,6 +70,12 @@ class R12(unittest.TestCase):
         self.assertEqual(p.returncode, 2)
         self.assertIn("GEODATA", report["diagnostics"][0])
 
+    def test_empty_required_resource_category(self):
+        (self.root / "GEODATA" / "LOFTEMPS.DAT").unlink()
+        p, report = self.run_cli()
+        self.assertEqual(p.returncode, 2)
+        self.assertTrue(any("GEODATA" in x for x in report["diagnostics"]))
+
     def test_inspect_can_report_invalid_files(self):
         (self.root / "MAPS" / "TEST.MAP").write_bytes(b"broken")
         p, report = self.run_cli("inspect")
