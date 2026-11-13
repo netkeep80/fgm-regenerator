@@ -1,14 +1,37 @@
-# Requirements hierarchy
+# Иерархия требований: FGM Regenerator — регенератор 3D-ресурсов
 
-**Canonical source:** `requirements/*.rg.yaml` (normative text and lifecycle). README and this page are explanations, not independent normative authority.
+## Нормативный источник
 
-```text
-FGMR-PRODUCT-000   Product capability root
-FGMR-PROJECT-000   Project and evidence root
-  ├── FGMR-GOV-001   RepoGuard immutable BASE/HEAD integration
-  └── FGMR-LIC-001   License and asset boundary
-```
+Нормативные формулировки и жизненный цикл требований хранятся только в `requirements/*.rg.yaml`. Этот документ поясняет структуру, но не является вторым источником обязательных правил.
 
-Product and project requirements are deliberately separate. `derives_from` gives the decomposition, `implemented_by` identifies an actual implementing resource, `verified_by` identifies an executable verification resource, and `documents` is a documentation link only. At bootstrap, the only claimed implementation is the RepoGuard workflow; no product feature or functional test is claimed.
+## Корневые требования
 
-RepoGuard v6.0.1 is pinned to commit `74db97791e6da8a75287164f0d0b41579108f114`. A full transition check compares the exact PR BASE→HEAD and is not equivalent to HEAD→HEAD. GitHub Actions itself does not enable branch protection; an administrator must set the `RepoGuard exact BASE/HEAD` job as required.
+- **FGMR-PRODUCT-000** — требования к будущим функциям продукта.
+- **FGMR-PROJECT-000** — требования к управлению проектом, проверке изменений и лицензированию.
+
+## Декомпозиция проектных требований
+
+- **FGMR-GOV-001** — проверка точных BASE/HEAD компилятором RepoGuard v6.0.1.
+- **FGMR-LIC-001** — сохранение принятой лицензии и границ использования сторонних ресурсов.
+- **FGMR-DOC-001** — русский язык всей поддерживаемой проектом документации.
+
+Все три требования наследуются от `FGMR-PROJECT-000` через отношение `derives_from`.
+
+## Отношения доказательств
+
+- `implemented_by` — конкретный файл реализации.
+- `verified_by` — конкретный исполняемый проверочный ресурс.
+- `documents` — точная документирующая поверхность, не доказательство исполнения.
+- `derives_from` — происхождение требования.
+
+## Контроль языка
+
+Проверяются все отслеживаемые Markdown-файлы и нормативные поля `normative` канонических Requirements. Текст заголовков, описаний, инструкций и пояснений должен быть русскоязычным.
+
+Исключения: исходные тексты лицензий, программный код, машинные форматы, идентификаторы, ссылки, имена собственные и устоявшиеся технические обозначения. Каталоги стороннего кода не переводятся без соблюдения прав на соответствующие материалы.
+
+Проверка использует детерминированную эвристику: англоязычные строки без кириллицы и без одних лишь технических обозначений отклоняются. **Это машинная проверка, но не полноценная лингвистическая экспертиза:** смешанный русско-английский текст может потребовать независимого редакторского контроля.
+
+Исполняемый тест расположен в `tests/document-language.test.mjs`; сам скрипт — в `scripts/check-document-language.mjs`. Он выполняется в том же CI-job, что и RepoGuard, до анализа причинных связей. В RepoGuard свидетельство объявлено как `execution`, но имеет статус делегированного: компилятор не заменяет запуск теста.
+
+Если изменение касается языка документации, отсутствие исполнения проверяющего скрипта нельзя выдавать за подтверждение соответствия. Зелёный статус RepoGuard и GitHub Actions не означает автоматического принятия требований владельцем.

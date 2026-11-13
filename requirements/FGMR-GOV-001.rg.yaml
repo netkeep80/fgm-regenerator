@@ -1,6 +1,6 @@
 format: repo-guard/requirement-v1
 id: FGMR-GOV-001
-normative: "### FGMR-GOV-001 — For every PR targeting main, CI shall check exact BASE and HEAD with immutable RepoGuard v6.0.1 at 74db97791e6da8a75287164f0d0b41579108f114; absence of mandatory GitHub branch protection or functional testing must not be represented as such protection."
+normative: "### FGMR-GOV-001 — Каждый pull request в main должен проверяться RepoGuard v6.0.1 по неизменяемому коммиту 74db97791e6da8a75287164f0d0b41579108f114 с точными BASE и HEAD. Отсутствие защиты ветки и предметных тестов нельзя выдавать за установленную защиту."
 lifecycle:
   accepted: true
   current: true
