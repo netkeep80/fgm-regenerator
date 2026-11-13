@@ -1,0 +1,12 @@
+format: repo-guard/requirement-v1
+id: FGMR-PROJECT-000
+normative: "### FGMR-PROJECT-000 — Минимальный исходный governance baseline\n\nРепозиторий должен сохранять уже принятый LICENSE; последующее добавление исполняемых требований и проверок выполняется отдельным проверяемым переходом."
+lifecycle:
+  accepted: true
+  current: true
+  published: false
+relations:
+  - predicates: [documents]
+    target:
+      kind: artifact
+      path: "LICENSE"
